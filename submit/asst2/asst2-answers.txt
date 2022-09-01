@@ -1,0 +1,69 @@
+1. What happens to a thread when it exits (i.e., calls thread_exit())? What about when it sleeps?
+
+Based on src/kern/thread/thread.c:
+When a thread exits, it will detech from the process and marked as zombies. Then zombies will be destroyed by calling thread_destroy().
+When a thread sleeps, it will suspend its execution and be added to a wait channel(wchan). It will remain sleeping until any of the wchan_wake functions is called.
+
+================================================================
+
+2. What function(s) handle(s) a context switch?
+
+In src/kern/thread/thread.c, line 558, thread_switch().
+
+================================================================
+
+3. What does it mean for a thread to be in each of the possible thread states?
+
+A thread can have four different states:
+    S_READY : The thread is just created and ready to run(runnable).
+    S_RUN   : The thread is currently running.
+    S_SLEEP : The thread is in wait channel, sleeping.
+    S_ZOMBIE: The thread is exited, waiting to be destroyed.
+
+================================================================
+
+4. What does it mean to turn interrupts off? How is this accomplished? Why is it important to turn off interrupts in the thread subsystem code?
+
+a) When interrupts are turned off, the thread will ignore all the interrupts.
+b) This is accomplished by calling function splhigh() from src/kern/include/spl.h.
+c) Interrupts can be harmful, especially when the thread is switching between different states. If the CPU is interrupted during this process, the thread may not switch to the correct state and causes unpredicted errors.
+
+================================================================
+
+5. What happens when a thread wakes up another thread? How does a sleeping thread get to run again?
+
+a) When a thread wakes up another thread by calling thread_make_runnable() function, it will lock the runqueue and put the target thread into the runqueue. Then release the lock.
+b) A sleeping thread can get to run again by calling wchan_wakeone() with its wchan or by simply calling wchan_wakeall().
+
+================================================================
+
+6. What function(s) choose(s) the next thread to run?
+
+thread_make_runnable() in src/kern/thread/thread.c, line 448
+
+================================================================
+
+7. How does it (do they) pick the next thread?
+
+thread_make_runnable(): pick the next thread by calling function threadlist_remhead(). This function dequeues and returns the first thread in runqueue.
+
+================================================================
+
+8. What role does the hardware timer play in scheduling? What hardware independent function is called on a timer interrupt?
+
+a) The frequency of the scheduler is determined by the hardware timer. 
+b) Function hardclock() is called on a timer interrupt. It is in src/kern/thread/clock.c, line 92.
+
+================================================================
+
+9. Describe how wchan_sleep() and wchan_wakeone() are used to implement semaphores.
+
+Based on src/kern/thread/synch.c:
+When function P() is called, wchan_sleep() is used to lock the semaphore until the counter reaches 1. After that, the semaphore counter will be decremented.
+When function V() is called, wchan_wakeone() is used to wake a sleeping thread after increasing the counter.
+
+================================================================
+
+10. How does the implementation of wchan ensure that a thread never misses a wakeup signal: that another thread cannot attempt to awaken the first thread just as it is preparing to sleep, but before it is actually placed into the sleep queue?
+
+According to the question, the only situation where the first thread will be waken by another thread is the wait channel is empty since otherwise the early come thread will be waken. In this case, wchan_sleep() which is called by the first thread is using a spinlock to ensure that the thread will not appear in the wait channel until the sleep process is completed. Which means the awake function will not be able to reach the first thread until it is ready to be waken.

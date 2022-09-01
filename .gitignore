@@ -1,0 +1,7 @@
+.DS_Store
+/build/
+/kern/compile/
+.vscode/
+defs.mk
+*.diff
+*.rej
